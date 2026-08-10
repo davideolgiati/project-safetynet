@@ -1,0 +1,4 @@
+--no-logo                                 Omits the logo during startup
+--config-path=<path/to/config.json>       Source config from user provided directory 
+                                          (default directory is "./config.json")
+--help                                    Print this message and exits
