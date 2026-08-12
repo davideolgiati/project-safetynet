@@ -3,6 +3,7 @@ mod archive;
 mod compression_level;
 mod file_filter;
 mod progress_bar;
+pub mod logger;
 
 use std::env;
 use std::time::SystemTime;
@@ -29,7 +30,11 @@ fn archive_item(config: &Item) -> Result<bool, std::io::Error> {
         .duration_since(start)
         .expect("Error while computing processing time");
 
-    println!("[i] Job \"{}\" done in {}ms", config.nickname, elapsed.as_millis());
+    info!(
+        "Job \"{}\" done in {}ms", 
+        config.nickname, 
+        elapsed.as_millis()
+    );
     
     Ok(true)
 }
@@ -43,7 +48,6 @@ fn main() -> Result<(), std::io::Error> {
 
     if args.iter().any(|a| a == "--help") {
         help();
-
         return Ok(())
     }
 
@@ -58,6 +62,8 @@ fn main() -> Result<(), std::io::Error> {
         None => "config.json".to_string()
     };
     
+    info!("Using \"{}\" as configuration file", config_path);
+
     let configs = load_configuration(&config_path);
 
     let valid_config_entries: Vec<&Item> = configs
@@ -65,10 +71,14 @@ fn main() -> Result<(), std::io::Error> {
         .filter(|config: &&config::Item| validate_configuration_entry(config))
         .collect();
 
-    println!("[i] Found {}/{} valid configurations", valid_config_entries.len(), configs.len());
+    info!(
+        "Found {}/{} valid configurations", 
+        valid_config_entries.len(), 
+        configs.len()
+    );
 
     for config in valid_config_entries {
-        println!("[i] Started Job \"{}\"", config.nickname);
+        info!("Started Job \"{}\"", config.nickname);
         archive_item(config)?;
     }
     

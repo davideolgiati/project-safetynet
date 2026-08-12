@@ -10,6 +10,7 @@ use regex::Regex;
 use crate::compression_level::CompressionLevel;
 use crate::config::Item;
 use crate::file_filter::{build_regex_registry, filter_files, get_files_indirectory};
+use crate::info;
 use crate::progress_bar::{display_progress_bar, new_progress_bar, progress_index, update_progress_bar};
 
 fn new_archive_name() -> String {
@@ -26,7 +27,7 @@ fn compose_archive_path(nickname: &String, output_directory: &str) -> PathBuf {
     let archive_name = generate_archive_file_name(nickname, archive_ts);
     let output_dir = Path::new(output_directory).join(archive_name);
 
-    println!("[i] Using {} as output directory", output_dir.display());
+    info!("Using {} as output directory", output_dir.display());
 
     output_dir
 }
@@ -38,11 +39,11 @@ fn create_tar_gz(archive_path: &Path) -> Result<File, std::io::Error> {
 fn gzip_encoder(tar_gz: File, compression_level: &CompressionLevel) -> GzEncoder<File> {
     let compression = match compression_level {
         CompressionLevel::Best => {
-            println!("[i] Using max compression algorithm - level 9");
+            info!("Using max compression algorithm - level 9");
             Compression::best()
         },
         CompressionLevel::Fast => {
-            println!("[i] Using fastest compression algorithm - level 1");
+            info!("Using fastest compression algorithm - level 1");
             Compression::fast()
         }
     };
@@ -51,7 +52,7 @@ fn gzip_encoder(tar_gz: File, compression_level: &CompressionLevel) -> GzEncoder
 }
 
 fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &[Regex], exclude_rgx: &[Regex]) -> Result<(), std::io::Error> {
-    println!("[i] Starting {} compression ... ", input_path);
+    info!("Starting {} compression ... ", input_path);
 
     let mut tar = tar::Builder::new(enc);
     let files = filter_files(get_files_indirectory(Path::new(input_path)), include_rgx, exclude_rgx);
