@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use regex::Regex;
 
-pub fn get_files_indirectory(directory: &Path) -> Vec<String> {
+pub fn get_files_in_directory(directory: &Path) -> Vec<String> {
     let mut files = Vec::new();
     let mut dirs = vec![directory.to_path_buf()];
 

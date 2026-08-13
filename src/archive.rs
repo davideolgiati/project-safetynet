@@ -9,7 +9,7 @@ use regex::Regex;
 
 use crate::compression_level::CompressionLevel;
 use crate::config::Item;
-use crate::file_filter::{build_regex_registry, filter_files, get_files_indirectory};
+use crate::file_filter::{build_regex_registry, filter_files, get_files_in_directory};
 use crate::info;
 use crate::progress_bar::{display_progress_bar, new_progress_bar, progress_index, update_progress_bar};
 
@@ -55,7 +55,7 @@ fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &[Regex], 
     info!("Starting {} compression ... ", input_path);
 
     let mut tar = tar::Builder::new(enc);
-    let files = filter_files(get_files_indirectory(Path::new(input_path)), include_rgx, exclude_rgx);
+    let files = filter_files(get_files_in_directory(Path::new(input_path)), include_rgx, exclude_rgx);
 
     let mut cnt = 0usize;
     let mut progress_bar = new_progress_bar(70);
