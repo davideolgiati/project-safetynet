@@ -5,11 +5,11 @@ use std::time::SystemTime;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use chrono::{DateTime, Utc};
-use regex::Regex;
+use regex::RegexSet;
 
 use crate::compression_level::CompressionLevel;
 use crate::config::Item;
-use crate::file_filter::{build_regex_registry, filter_files, get_files_in_directory};
+use crate::file_filter::{build_regex_registry, get_files_in_directory};
 use crate::info;
 use crate::progress_bar::{display_progress_bar, new_progress_bar, progress_index, update_progress_bar};
 
@@ -51,11 +51,11 @@ fn gzip_encoder(tar_gz: File, compression_level: &CompressionLevel) -> GzEncoder
     GzEncoder::new(tar_gz, compression)
 }
 
-fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &[Regex], exclude_rgx: &[Regex]) -> Result<(), std::io::Error> {
+fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> Result<(), std::io::Error> {
     info!("Starting {} compression ... ", input_path);
 
     let mut tar = tar::Builder::new(enc);
-    let files = filter_files(get_files_in_directory(Path::new(input_path)), include_rgx, exclude_rgx);
+    let files = get_files_in_directory(input_path, include_rgx, exclude_rgx);
 
     let mut cnt = 0usize;
     let mut progress_bar = new_progress_bar(70);
@@ -97,7 +97,7 @@ pub fn create_archive(config: &Item) -> Result<(), std::io::Error> {
     let archive_path = compose_archive_path(&config.nickname, output_dir);
     let tar_gz = create_tar_gz(&archive_path)?;
     let enc = gzip_encoder(tar_gz, compression_level);
-    let include_rgx = build_regex_registry(&config.include, vec![Regex::new(".*").unwrap()]);
+    let include_rgx = build_regex_registry(&config.include, vec![".*".to_string()]);
     let exclude_rgx = build_regex_registry(&config.exclude, Vec::new());
     write_archive(enc, &config.input_path, &include_rgx, &exclude_rgx)
 }

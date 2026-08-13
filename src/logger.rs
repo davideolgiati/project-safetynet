@@ -10,27 +10,27 @@ pub fn current_ts() -> String {
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {
-        println!("[{}] [INFO ] {}", $crate::logger::current_ts(), format!($($arg)*));
+        println!("[{}] [INFO ] {}", $crate::logger::current_ts(), format!($($arg)*))
     };
 }
 
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {
-        println!("[{}] [WARN ] {}", $crate::logger::current_ts(), format!($($arg)*));
+        println!("[{}] [WARN ] {}", $crate::logger::current_ts(), format!($($arg)*))
     };
 }
 
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {
-        println!("[{}] [ ERR ] {}", $crate::logger::current_ts(), format!($($arg)*));
+        println!("[{}] [ ERR ] {}", $crate::logger::current_ts(), format!($($arg)*))
     };
 }
 
 #[macro_export]
-macro_rules! debug {
+macro_rules! trace {
     ($($arg:tt)*) => {
-        println!("[{}] [DEBUG] {}", $crate::logger::current_ts(), format!($($arg)*));
+        println!("[{}] [DEBUG] {}", $crate::logger::current_ts(), format!($($arg)*))
     };
 }
