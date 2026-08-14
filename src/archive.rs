@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -13,42 +14,40 @@ use crate::file_filter::{build_regex_registry, get_files_in_directory};
 use crate::info;
 use crate::progress_bar::{display_progress_bar, new_progress_bar, progress_index, update_progress_bar};
 
-fn new_archive_name() -> String {
-    let now: DateTime<Utc> = SystemTime::now().into();
-    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+pub struct Archive(PathBuf);
+
+impl Archive {
+    fn new(nickname: &Nickname, output_directory: &WorkingPath) -> Archive {
+        let unix_ts: DateTime<Utc> = SystemTime::now().into();
+        let now = unix_ts.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let archive_name = format!("{}-{}.tar.gz", nickname, now);
+
+
+        Archive(Path::new(&output_directory.to_string()).join(archive_name))
+    }
+
+    fn get_encoder(self, compression_level: &CompressionLevel) -> Result<GzEncoder<File>, io::Error> {
+        let archive_path = File::create(self.0)?;
+
+        let compression = match compression_level {
+            CompressionLevel::Best => {
+                info!("Using max compression algorithm - level 9");
+                Compression::best()
+            },
+            CompressionLevel::Fast => {
+                info!("Using fastest compression algorithm - level 1");
+                Compression::fast()
+            }
+        };
+
+        Ok(GzEncoder::new(archive_path, compression))
+    }
 }
 
-fn generate_archive_file_name(nickname: &Nickname, archive_ts: String) -> String {
-    format!("{}-{}.tar.gz", nickname, archive_ts)
-}
-
-fn compose_archive_path(nickname: &Nickname, output_directory: &WorkingPath) -> PathBuf {
-    let archive_ts = new_archive_name();
-    let archive_name = generate_archive_file_name(nickname, archive_ts);
-    let output_dir = Path::new(&output_directory.to_string()).join(archive_name);
-
-    info!("Using {} as output directory", output_dir.display());
-
-    output_dir
-}
-
-fn create_tar_gz(archive_path: &Path) -> Result<File, std::io::Error> {
-    File::create(archive_path)
-}
-
-fn gzip_encoder(tar_gz: File, compression_level: &CompressionLevel) -> GzEncoder<File> {
-    let compression = match compression_level {
-        CompressionLevel::Best => {
-            info!("Using max compression algorithm - level 9");
-            Compression::best()
-        },
-        CompressionLevel::Fast => {
-            info!("Using fastest compression algorithm - level 1");
-            Compression::fast()
-        }
-    };
-
-    GzEncoder::new(tar_gz, compression)
+impl Display for Archive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.display())
+    }
 }
 
 fn write_archive(enc: GzEncoder<File>, input_path: &WorkingPath, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> Result<(), std::io::Error> {
@@ -98,10 +97,11 @@ pub fn create_archive(config: &Item) -> Result<(), std::io::Error> {
         Some(value) => value,
         None => &CompressionLevel::Fast
     };
+    
+    let archive = Archive::new(&config.nickname, output_directory);
+    info!("Using {} as output path", archive);
 
-    let archive_path = compose_archive_path(&config.nickname, output_directory);
-    let tar_gz = create_tar_gz(&archive_path)?;
-    let enc = gzip_encoder(tar_gz, compression_level);
+    let enc = archive.get_encoder(compression_level)?;
     let include_rgx = build_regex_registry(&config.include, vec![".*".to_string()]);
     let exclude_rgx = build_regex_registry(&config.exclude, Vec::new());
     write_archive(enc, &config.input_path, &include_rgx, &exclude_rgx)
