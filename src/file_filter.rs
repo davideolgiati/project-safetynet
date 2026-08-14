@@ -1,35 +1,60 @@
+use regex::RegexSet;
 use std::fs;
 use std::path::Path;
-use regex::RegexSet;
 
 use crate::trace;
 
 enum PathType {
     Directory,
-    File,
-    Skip
+    File(String),
+    Skip(String),
 }
 
-fn is_valid(path: &str, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> bool {
-    include_rgx.is_match(path) &&
-    !exclude_rgx.is_match(path)
+enum FilterOutcome {
+    MatchExclude(String),
+    NoMatchInclude,
+    Valid,
+}
+
+fn is_valid(path: &str, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> FilterOutcome {
+    if !include_rgx.is_match(path) {
+        return FilterOutcome::NoMatchInclude;
+    }
+
+    let matches: Vec<_> = exclude_rgx
+        .matches(path)
+        .into_iter()
+        .map(|index| exclude_rgx.patterns()[index].as_str())
+        .collect();
+
+    if matches.is_empty() {
+        return FilterOutcome::Valid;
+    }
+
+    FilterOutcome::MatchExclude(format!(
+        "{} matched by the following exclude regexes: {}",
+        path,
+        matches.join(", ")
+    ))
 }
 
 pub fn build_regex_registry(rules: &Option<Vec<String>>, default: Vec<String>) -> RegexSet {
     let patterns = rules.as_ref().unwrap_or(&default);
-    RegexSet::new(patterns.iter().map(|r| format!("(?i){}", r))).unwrap()
+    RegexSet::new(patterns.iter().map(|r| format!("(?i){}", r))).unwrap() // fix me
 }
 
 fn identify_path(path: &Path, include: &RegexSet, exclude: &RegexSet) -> PathType {
     if path.is_dir() {
-        return PathType::Directory
+        return PathType::Directory;
     }
 
-    if !is_valid(&path.to_string_lossy(), include, exclude) {
-        return PathType::Skip
-    }
+    let file = path.to_string_lossy();
 
-    PathType::File
+    match is_valid(&file, include, exclude) {
+        FilterOutcome::MatchExclude(msg) => PathType::Skip(msg),
+        FilterOutcome::NoMatchInclude => PathType::Skip(format!("{} did not match any include rule", file)),
+        FilterOutcome::Valid => PathType::File(file.to_string())
+    }
 }
 
 pub fn get_files_in_directory(path: &str, include: &RegexSet, exclude: &RegexSet) -> Vec<String> {
@@ -40,14 +65,20 @@ pub fn get_files_in_directory(path: &str, include: &RegexSet, exclude: &RegexSet
 
     while let Some(dir) = dirs.pop() {
         for path in fs::read_dir(&dir).unwrap() {
-            let entry = path.unwrap().path();
+            let entry = match path {
+                Ok(data) => data.path(),
+                Err(ref err) => {
+                    trace!("Error while working on {:?}: {}", path, err);
+                    continue;
+                }
+            };
 
             match identify_path(&entry, include, exclude) {
                 PathType::Directory => dirs.push(entry),
-                PathType::File => files.push(entry.to_string_lossy().into_owned()),
-                PathType::Skip => {
+                PathType::File(path) => files.push(path),
+                PathType::Skip(msg) => {
                     if debug {
-                        trace!("Path \"{}\" skipped", entry.to_string_lossy())
+                        trace!("{}", msg)
                     }
                 }
             }
