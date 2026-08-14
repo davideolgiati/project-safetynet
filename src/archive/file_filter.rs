@@ -2,7 +2,7 @@ use regex::{Error, RegexSet};
 use std::fs;
 use std::path::Path;
 
-use crate::config::WorkingPath;
+use crate::config::working_path::WorkingPath;
 use crate::trace;
 
 enum PathType {

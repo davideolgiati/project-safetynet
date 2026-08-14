@@ -1,48 +1,20 @@
-mod config;
 mod archive;
-mod compression_level;
-mod file_filter;
-mod progress_bar;
+mod cli;
+mod config;
+mod error;
 pub mod logger;
-mod safetynet_error;
+mod progress_bar;
 
 use std::env;
-use std::time::SystemTime;
 
-use config::{Item, load_configuration};
-use archive::create_archive;
-use safetynet_error::Result;
-
-fn logo() {
-    let logo = include_str!("assets/logo.txt");
-    println!("{logo}");
-}
-
-fn help() {
-    let help = include_str!("assets/help.txt");
-    println!("{help}");   
-}
-
-fn archive_item(config: &Item) -> Result<bool> {
-    let start = SystemTime::now();
-
-    create_archive(config)?;
-
-    let elapsed = SystemTime::now()
-        .duration_since(start)?;
-
-    info!(
-        "Job \"{}\" done in {}ms", 
-        config.nickname, 
-        elapsed.as_millis()
-    );
-    
-    Ok(true)
-}
+use archive::job::archive_item;
+use cli::{config_path, help, logo};
+use config::load_configuration;
+use error::Result;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    
+
     if !args.iter().any(|a| a == "--no-logo") {
         logo();
     }
@@ -52,17 +24,8 @@ fn main() -> Result<()> {
         return Ok(())
     }
 
-    let config_path =  match args.iter().rfind(|entry| entry.starts_with("--config-path")) {
-        Some(array) => array.split("=").skip(1).fold(String::new(), |acc, entry| {
-            if !acc.is_empty() {
-                return format!("{}={}", acc, entry).to_string();
-            }
+    let config_path = config_path(&args);
 
-            entry.to_string()
-        }),
-        None => "config.json".to_string()
-    };
-    
     info!("Using \"{}\" as configuration file", config_path);
 
     let configs = load_configuration(&config_path)?;
@@ -71,6 +34,6 @@ fn main() -> Result<()> {
         info!("Started Job \"{}\"", config.nickname);
         archive_item(&config)?;
     }
-    
+
     Ok(())
 }
