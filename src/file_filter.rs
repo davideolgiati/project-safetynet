@@ -2,6 +2,7 @@ use regex::RegexSet;
 use std::fs;
 use std::path::Path;
 
+use crate::config::WorkingPath;
 use crate::trace;
 
 enum PathType {
@@ -57,8 +58,9 @@ fn identify_path(path: &Path, include: &RegexSet, exclude: &RegexSet) -> PathTyp
     }
 }
 
-pub fn get_files_in_directory(path: &str, include: &RegexSet, exclude: &RegexSet) -> Vec<String> {
-    let directory = Path::new(path);
+pub fn get_files_in_directory(path: &WorkingPath, include: &RegexSet, exclude: &RegexSet) -> Vec<String> {
+    let path_str = path.to_string();
+    let directory = Path::new(&path_str);
     let mut files = Vec::new();
     let mut dirs = vec![directory.to_path_buf()];
     let debug = false; // future use

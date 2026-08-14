@@ -1,67 +1,106 @@
-use std::path::Path;
-use std::fs;
-use serde::Deserialize;
 use regex::regex;
+use serde::Deserialize;
+use std::fmt::Display;
+use std::fs;
+use std::path::Path;
 
 use crate::compression_level::CompressionLevel;
-use crate::{error, info};
+use crate::info;
 
+pub enum ConfigValueError {
+    InvalidNickname(String),
+    InvalidWorkingPath(String)
+}
+
+impl Display for ConfigValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigValueError::InvalidNickname(nick) => {
+                write!(f, "Invalid nickname '{}': must contain only lowercase letters and digits", nick)
+            },
+            ConfigValueError::InvalidWorkingPath(nick) => {
+                write!(f, "Invalid path '{}': must exists on filesystem", nick)
+            }
+        }
+    }
+}
+
+pub struct Nickname(String);
+
+impl<'de> Deserialize<'de> for Nickname {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        Nickname::new(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Nickname {
+    fn new(raw: &str) -> Result<Nickname, ConfigValueError> {
+        if regex!(r"^[a-z|\d]+$").is_match(raw) {
+            Ok(Nickname(raw.into()))
+        } else {
+            Err(ConfigValueError::InvalidNickname(raw.into()))
+        }
+    }
+}
+
+impl Display for Nickname {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub struct WorkingPath(String);
+
+impl<'de> Deserialize<'de> for WorkingPath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        WorkingPath::new(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+impl WorkingPath {
+    pub fn new(raw: &str) -> Result<WorkingPath, ConfigValueError> {
+        if Path::new(raw).exists() {
+            Ok(WorkingPath(raw.into()))
+        } else {
+            Err(ConfigValueError::InvalidWorkingPath(raw.into()))
+        }
+    }
+}
+
+impl Display for WorkingPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Deserialize)]
 pub struct Item {
-    pub nickname: String,
-    pub input_path: String,
-    pub output_directory: Option<String>,
+    pub nickname: Nickname,
+    pub input_path: WorkingPath,
+    pub output_directory: Option<WorkingPath>,
     pub compression_level: Option<CompressionLevel>,
     pub exclude: Option<Vec<String>>,
     pub include: Option<Vec<String>>
 }
 
-fn is_nickname_valid(nickname: &str) -> bool {
-    regex!(r"^[a-z|\d]+$").is_match(nickname)
-}
-
-fn path_exists(path: &str) -> bool {
-    Path::new(path).exists()
-}
-
 pub fn load_configuration(path: &str) -> Vec<Item> {
     info!("Loading configurations from: {}", path);
-    let config_content = fs::read_to_string(path)
-        .unwrap_or_else(|_| panic!("Failed to read {}", path));
 
-    let config_entries: Vec<Item> = serde_json::from_str(&config_content)
-        .expect("Failed to parse JSON configuration");
+    let config_content =
+        fs::read_to_string(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
+
+    let config_entries: Vec<Item> =
+        serde_json::from_str(&config_content).expect("Failed to parse JSON configuration");
 
     info!("Loaded {} entries", config_entries.len());
 
     config_entries
-}
-
-pub fn validate_configuration_entry(config: &Item) -> bool {
-    info!("Validating {} configuration ... ", config.nickname);
-
-    if !is_nickname_valid(&config.nickname) {
-        error!("Nickname: \"{}\" is not valid", config.nickname);
-        return false;
-    }
-
-    if !path_exists(&config.input_path) {
-        error!(
-            "Given input path \"{}\" for \"{}\" is missing on filesystem",
-            config.input_path, config.nickname
-        );
-        return false;
-    }
-
-    if let Some(dir) = &config.output_directory
-        && !path_exists(dir) {
-            error!(
-                "Given output directory \"{}\" for \"{}\" is missing on filesystem",
-                dir, config.nickname
-            );
-            return false;
-        }
-        
-    true
 }

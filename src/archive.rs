@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use regex::RegexSet;
 
 use crate::compression_level::CompressionLevel;
-use crate::config::Item;
+use crate::config::{Item, Nickname, WorkingPath};
 use crate::file_filter::{build_regex_registry, get_files_in_directory};
 use crate::info;
 use crate::progress_bar::{display_progress_bar, new_progress_bar, progress_index, update_progress_bar};
@@ -18,14 +18,14 @@ fn new_archive_name() -> String {
     now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
-fn generate_archive_file_name(nickname: &String, archive_ts: String) -> String {
+fn generate_archive_file_name(nickname: &Nickname, archive_ts: String) -> String {
     format!("{}-{}.tar.gz", nickname, archive_ts)
 }
 
-fn compose_archive_path(nickname: &String, output_directory: &str) -> PathBuf {
+fn compose_archive_path(nickname: &Nickname, output_directory: &WorkingPath) -> PathBuf {
     let archive_ts = new_archive_name();
     let archive_name = generate_archive_file_name(nickname, archive_ts);
-    let output_dir = Path::new(output_directory).join(archive_name);
+    let output_dir = Path::new(&output_directory.to_string()).join(archive_name);
 
     info!("Using {} as output directory", output_dir.display());
 
@@ -51,7 +51,7 @@ fn gzip_encoder(tar_gz: File, compression_level: &CompressionLevel) -> GzEncoder
     GzEncoder::new(tar_gz, compression)
 }
 
-fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> Result<(), std::io::Error> {
+fn write_archive(enc: GzEncoder<File>, input_path: &WorkingPath, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> Result<(), std::io::Error> {
     info!("Starting {} compression ... ", input_path);
 
     let mut tar = tar::Builder::new(enc);
@@ -66,7 +66,7 @@ fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &RegexSet,
 
     for file in files {
         let mut data: File = File::open(&file).unwrap();
-        let relative_path = format!("./{}", file.strip_prefix(input_path).unwrap());
+        let relative_path = format!("./{}", file.strip_prefix(&input_path.to_string()).unwrap());
         tar.append_file(relative_path, &mut data).unwrap();
         cnt += 1;
 
@@ -84,9 +84,14 @@ fn write_archive(enc: GzEncoder<File>, input_path: &str, include_rgx: &RegexSet,
 }
 
 pub fn create_archive(config: &Item) -> Result<(), std::io::Error> {
-    let output_dir = match &config.output_directory {
+    let default_path = match WorkingPath::new(".") {
+        Ok(path) => path,
+        Err(err) => panic!("{}", err)
+    };
+
+    let output_directory = match &config.output_directory {
         Some(dir) => dir,
-        None => "."
+        None => &default_path
     };
 
     let compression_level = match &config.compression_level {
@@ -94,7 +99,7 @@ pub fn create_archive(config: &Item) -> Result<(), std::io::Error> {
         None => &CompressionLevel::Fast
     };
 
-    let archive_path = compose_archive_path(&config.nickname, output_dir);
+    let archive_path = compose_archive_path(&config.nickname, output_directory);
     let tar_gz = create_tar_gz(&archive_path)?;
     let enc = gzip_encoder(tar_gz, compression_level);
     let include_rgx = build_regex_registry(&config.include, vec![".*".to_string()]);

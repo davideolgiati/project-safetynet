@@ -8,7 +8,7 @@ pub mod logger;
 use std::env;
 use std::time::SystemTime;
 
-use config::{Item, load_configuration, validate_configuration_entry};
+use config::{Item, load_configuration};
 use archive::create_archive;
 
 fn logo() {
@@ -66,20 +66,9 @@ fn main() -> Result<(), std::io::Error> {
 
     let configs = load_configuration(&config_path);
 
-    let valid_config_entries: Vec<&Item> = configs
-        .iter()
-        .filter(|config: &&config::Item| validate_configuration_entry(config))
-        .collect();
-
-    info!(
-        "Found {}/{} valid configurations", 
-        valid_config_entries.len(), 
-        configs.len()
-    );
-
-    for config in valid_config_entries {
+    for config in configs {
         info!("Started Job \"{}\"", config.nickname);
-        archive_item(config)?;
+        archive_item(&config)?;
     }
     
     Ok(())
