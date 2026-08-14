@@ -21,12 +21,18 @@ pub fn progress_index(cnt: usize, file_count: usize, bar: &[char]) -> usize {
     (cnt * width) / file_count.max(1)
 }
 
+pub fn flush_stdout() {
+    if io::stdout().flush().is_ok() {}
+}
+
 pub fn display_progress_bar(bar: &[char]) {
     let last = bar.len() - 1;
+    
     if bar[last - 1] == '=' {
         println!("\r{}", bar.iter().collect::<String>());
     } else {
         print!("\r{}", bar.iter().collect::<String>());
     }
-    io::stdout().flush().unwrap();
+
+    flush_stdout();
 }

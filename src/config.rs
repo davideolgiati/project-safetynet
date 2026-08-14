@@ -81,6 +81,12 @@ impl Display for WorkingPath {
     }
 }
 
+impl AsRef<Path> for WorkingPath {
+    fn as_ref(&self) -> &Path {
+        Path::new(&self.0)
+    }
+}
+
 #[derive(Deserialize)]
 pub struct Item {
     pub nickname: Nickname,

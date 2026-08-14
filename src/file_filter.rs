@@ -1,4 +1,4 @@
-use regex::RegexSet;
+use regex::{Error, RegexSet};
 use std::fs;
 use std::path::Path;
 
@@ -39,9 +39,9 @@ fn is_valid(path: &str, include_rgx: &RegexSet, exclude_rgx: &RegexSet) -> Filte
     ))
 }
 
-pub fn build_regex_registry(rules: &Option<Vec<String>>, default: Vec<String>) -> RegexSet {
+pub fn build_regex_registry(rules: &Option<Vec<String>>, default: Vec<String>) -> Result<RegexSet, Error> {
     let patterns = rules.as_ref().unwrap_or(&default);
-    RegexSet::new(patterns.iter().map(|r| format!("(?i){}", r))).unwrap() // fix me
+    RegexSet::new(patterns.iter().map(|r| format!("(?i){}", r)))
 }
 
 fn identify_path(path: &Path, include: &RegexSet, exclude: &RegexSet) -> PathType {
@@ -66,7 +66,14 @@ pub fn get_files_in_directory(path: &WorkingPath, include: &RegexSet, exclude: &
     let debug = false; // future use
 
     while let Some(dir) = dirs.pop() {
-        for path in fs::read_dir(&dir).unwrap() {
+        let dir = match fs::read_dir(&dir) {
+            Ok(dir) => dir,
+            Err(_) => {
+                continue;
+            }
+        };
+
+        for path in dir {
             let entry = match path {
                 Ok(data) => data.path(),
                 Err(ref err) => {
