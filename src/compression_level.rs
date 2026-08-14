@@ -26,7 +26,7 @@ impl<'de> Deserialize<'de> for CompressionLevel {
                 match v {
                     "fast" => Ok(CompressionLevel::Fast),
                     "best" => Ok(CompressionLevel::Best),
-                    _ => panic!("unknown value \"{}\" for compression level", v),
+                    _ => Err(E::unknown_variant(v, &["fast", "best"])),
                 }
             }
         }

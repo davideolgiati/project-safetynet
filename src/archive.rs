@@ -8,6 +8,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use crate::Result;
 use crate::compression_level::CompressionLevel;
 use crate::config::{Item, Nickname, WorkingPath};
 use crate::file_filter::{build_regex_registry, get_files_in_directory};
@@ -15,6 +16,7 @@ use crate::info;
 use crate::progress_bar::{
     display_progress_bar, flush_stdout, new_progress_bar, progress_index, update_progress_bar,
 };
+use crate::safetynet_error::SafetyNetError;
 
 pub struct Archive(PathBuf);
 
@@ -27,13 +29,10 @@ impl Archive {
         Archive(output_directory.as_ref().join(archive_name))
     }
 
-    fn get_encoder(
-        self,
-        compression_level: &CompressionLevel,
-    ) -> Result<GzEncoder<File>, io::Error> {
+    fn get_encoder(self, level: &CompressionLevel) -> Result<GzEncoder<File>> {
         let archive_path = File::create(self.0)?;
 
-        let compression = match compression_level {
+        let compression = match level {
             CompressionLevel::Best => {
                 info!("Using max compression algorithm - level 9");
                 Compression::best()
@@ -59,7 +58,7 @@ fn write_archive(
     input_path: &WorkingPath,
     include_rgx: &RegexSet,
     exclude_rgx: &RegexSet,
-) -> Result<(), std::io::Error> {
+) -> Result<()> {
     info!("Starting {} compression ... ", input_path);
 
     let mut tar = tar::Builder::new(enc);
@@ -95,10 +94,12 @@ fn write_archive(
     Ok(())
 }
 
-pub fn create_archive(config: &Item) -> Result<(), std::io::Error> {
+pub fn create_archive(config: &Item) -> Result<()> {
     let default_path = match WorkingPath::new(".") {
         Ok(path) => path,
-        Err(err) => panic!("{}", err), // fix me!
+        Err(err) => {
+            return Err(SafetyNetError(err.to_string()))
+        } 
     };
 
     let output_directory = match &config.output_directory {
@@ -115,13 +116,20 @@ pub fn create_archive(config: &Item) -> Result<(), std::io::Error> {
     info!("Using {} as output path", archive);
 
     let enc = archive.get_encoder(compression_level)?;
+    
     let include_rgx = match build_regex_registry(&config.include, vec![".*".to_string()]) {
         Ok(set) => set,
-        Err(err) => panic!("{}", err) // fix me!
+        Err(err) => {
+            return Err(SafetyNetError::from(err))
+        }
     };
+
     let exclude_rgx = match build_regex_registry(&config.exclude, Vec::new()) {
         Ok(set) => set,
-        Err(err) => panic!("{}", err) // fix me!
+        Err(err) => {
+            return Err(SafetyNetError::from(err))
+        }
     };
+    
     write_archive(enc, &config.input_path, &include_rgx, &exclude_rgx)
 }

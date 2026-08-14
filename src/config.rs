@@ -6,6 +6,7 @@ use std::path::Path;
 
 use crate::compression_level::CompressionLevel;
 use crate::info;
+use crate::Result;
 
 pub enum ConfigValueError {
     InvalidNickname(String),
@@ -28,7 +29,7 @@ impl Display for ConfigValueError {
 pub struct Nickname(String);
 
 impl<'de> Deserialize<'de> for Nickname {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -38,7 +39,7 @@ impl<'de> Deserialize<'de> for Nickname {
 }
 
 impl Nickname {
-    fn new(raw: &str) -> Result<Nickname, ConfigValueError> {
+    fn new(raw: &str) -> std::result::Result<Nickname, ConfigValueError> {
         if regex!(r"^[a-z|\d]+$").is_match(raw) {
             Ok(Nickname(raw.into()))
         } else {
@@ -56,7 +57,7 @@ impl Display for Nickname {
 pub struct WorkingPath(String);
 
 impl<'de> Deserialize<'de> for WorkingPath {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::de::Deserializer<'de>,
     {
@@ -66,7 +67,7 @@ impl<'de> Deserialize<'de> for WorkingPath {
 }
 
 impl WorkingPath {
-    pub fn new(raw: &str) -> Result<WorkingPath, ConfigValueError> {
+    pub fn new(raw: &str) -> std::result::Result<WorkingPath, ConfigValueError> {
         if Path::new(raw).exists() {
             Ok(WorkingPath(raw.into()))
         } else {
@@ -97,16 +98,13 @@ pub struct Item {
     pub include: Option<Vec<String>>
 }
 
-pub fn load_configuration(path: &str) -> Vec<Item> {
+pub fn load_configuration(path: &str) -> Result<Vec<Item>> {
     info!("Loading configurations from: {}", path);
 
-    let config_content =
-        fs::read_to_string(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
-
-    let config_entries: Vec<Item> =
-        serde_json::from_str(&config_content).expect("Failed to parse JSON configuration");
+    let config_content = fs::read_to_string(path)?;
+    let config_entries: Vec<Item> = serde_json::from_str(&config_content)?;
 
     info!("Loaded {} entries", config_entries.len());
 
-    config_entries
+    Ok(config_entries)
 }

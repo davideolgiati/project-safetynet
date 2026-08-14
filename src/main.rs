@@ -4,12 +4,14 @@ mod compression_level;
 mod file_filter;
 mod progress_bar;
 pub mod logger;
+mod safetynet_error;
 
 use std::env;
 use std::time::SystemTime;
 
 use config::{Item, load_configuration};
 use archive::create_archive;
+use safetynet_error::Result;
 
 fn logo() {
     let logo = include_str!("assets/logo.txt");
@@ -21,14 +23,13 @@ fn help() {
     println!("{help}");   
 }
 
-fn archive_item(config: &Item) -> Result<bool, std::io::Error> {
+fn archive_item(config: &Item) -> Result<bool> {
     let start = SystemTime::now();
 
     create_archive(config)?;
 
     let elapsed = SystemTime::now()
-        .duration_since(start)
-        .expect("Error while computing processing time");
+        .duration_since(start)?;
 
     info!(
         "Job \"{}\" done in {}ms", 
@@ -39,7 +40,7 @@ fn archive_item(config: &Item) -> Result<bool, std::io::Error> {
     Ok(true)
 }
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     
     if !args.iter().any(|a| a == "--no-logo") {
@@ -64,7 +65,7 @@ fn main() -> Result<(), std::io::Error> {
     
     info!("Using \"{}\" as configuration file", config_path);
 
-    let configs = load_configuration(&config_path);
+    let configs = load_configuration(&config_path)?;
 
     for config in configs {
         info!("Started Job \"{}\"", config.nickname);
