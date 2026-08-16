@@ -1,86 +1,76 @@
 use std::fmt::Display;
 use std::io::{self, Write};
 
-struct Begin;
-struct Progressing;
-struct Done;
-
-
-struct ProgressBar<State = Begin> {
-    index: usize,
+pub struct ProgressBar {
     bar: Vec<char>,
-    _state: std::marker::PhantomData<State>
+    seen: usize,
+    ratio: f64,
+    refresh: bool
 }
 
-impl ProgressBar<Begin> {
-    fn new(size: usize) -> ProgressBar<Progressing> {
+impl ProgressBar {
+    pub fn new(cols: usize, population: usize) -> ProgressBar {
         let bar = {
-            let mut bar: Vec<char> = vec![' '; size];
+            let mut bar: Vec<char> = vec![' '; cols];
             bar[0] = '[';
             bar[1] = '>';
-            bar[size - 1] = ']';
+            bar[cols - 1] = ']';
             bar
         };
 
-        ProgressBar::<Progressing> { 
-            index: 0, 
+        ProgressBar { 
             bar,
-            _state: std::marker::PhantomData
+            seen: 0,
+            ratio: (cols - 2) as f64 / population as f64,
+            refresh: true
         }
     }
-}
 
-impl ProgressBar<Progressing> {
-    fn update(mut self) -> Step<'static> {
-        self.bar[self.index] = '=';
-        self.bar[self.index + 1] = '>';
-        self.index += 1;
+    fn index(&self) -> usize {
+        ((self.seen as f64 * self.ratio) as usize).min(self.bar.len() - 2)
+    }
 
-        if self.index == self.bar.len() - 2 {
-            Step::Last(ProgressBar::<Last> {
-                index: self.index,
-                bar: self.bar,
-                _state: std::marker::PhantomData,
-            })
+    pub fn progress(&mut self) {
+        let current_idx = self.index();
+
+        self.seen += 1;
+
+        let index = self.index();
+
+        if index == current_idx {
+            return
+        }
+
+        self.bar[index] = '=';
+
+        if index != self.bar.len() - 2 {
+            self.bar[index + 1] = '>';
+        }
+
+        self.refresh = true
+    }
+
+    pub fn show(&mut self) {
+        if !self.refresh {
+            return
+        }
+
+        let index = self.index();
+
+        if index != self.bar.len() - 2 {
+            print!("\r{}", self)
         } else {
-            Step::Progressing(&self)
+            println!("\r{}", self)
         }
+
+        let _ = io::stdout().flush().is_ok();
+
+        self.refresh = false;
     }
 }
 
-
-
-impl Display for ProgressBar<Begin> {
+impl Display for ProgressBar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\r{}", self.bar.iter().collect::<String>())
+        write!(f, "{}", self.bar.iter().collect::<String>())
     }
-}
-
-impl Display for ProgressBar<Progressing> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\r{}", self.bar.iter().collect::<String>())
-    }
-}
-
-impl Display for ProgressBar<Done> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\r{}\n", self.bar.iter().collect::<String>())
-    }
-}
-
-pub fn update_progress_bar(index: usize, bar: &mut [char]) {
-    let last = bar.len() - 1;
-    bar[index] = '=';
-    if index != last - 1 {
-        bar[index + 1] = '>';
-    }
-}
-
-pub fn progress_index(cnt: usize, file_count: usize, bar: &[char]) -> usize {
-    let width = bar.len() - 2;
-    (cnt * width) / file_count.max(1)
-}
-
-pub fn flush_stdout() {
-    if io::stdout().flush().is_ok() {}
 }
